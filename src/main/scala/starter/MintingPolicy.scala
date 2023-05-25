@@ -41,9 +41,9 @@ object MintingPolicy {
     // ensure that we are minting and get the PolicyId of the token we are minting
     val ownSymbol = ctx.purpose match
       case Minting(curSymbol)     => curSymbol
-      case Spending(txOutRef)     => throw new RuntimeException("PS")
-      case Rewarding(stakingCred) => throw new RuntimeException("PR")
-      case Certifying(cert)       => throw new RuntimeException("PC")
+      case Spending(_)     => throw new RuntimeException("PS")
+      case Rewarding(_) => throw new RuntimeException("PR")
+      case Certifying(_)       => throw new RuntimeException("PC")
     val txInfo = ctx.txInfo
     val txOutRefs = List.map(txInfo.inputs)(_.outRef)
     // find the tokens minted by this policy id
@@ -62,8 +62,8 @@ object MintingPolicy {
       // Otherwise, it's a burn transaction
       case Nothing =>
         // check burned
-        val burned = List.all(AssocMap.toList(mintedTokens)) { case (tokenName, amount) =>
-          Builtins.lessThanInteger(amount, BigInt(0))
+        val burned = List.all(mintedTokens.inner) { case (tokenName, amount) =>
+          amount < 0
         }
         check(burned, "B")
   }

@@ -25,7 +25,7 @@ class MintingPolicySpec extends AnyFunSuite with ScalaCheckPropertyChecks {
 
   test("validator size is correct") {
     val flatSize = HoskyMintingPolicyValidator.flatEncoded.length
-    assert(flatSize == 2457)
+    assert(flatSize == 2458)
   }
 
   test("should succeed when the TxOutRef is spent and the minted tokens are correct") {
