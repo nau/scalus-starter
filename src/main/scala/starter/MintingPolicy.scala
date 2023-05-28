@@ -32,7 +32,7 @@ object MintingPolicy {
   import List.*
 
   def mintingPolicyScript(
-      txId: ByteString,
+      txId: ByteString, // TxId and output index we must spend to mint tokens
       txOutIdx: BigInt,
       tokensToMint: AssocMap[ByteString, BigInt]
   ) = (redeemer: Unit, ctxData: Data) => {
@@ -40,10 +40,10 @@ object MintingPolicy {
     val ctx = fromData[ScriptContext](ctxData)
     // ensure that we are minting and get the PolicyId of the token we are minting
     val ownSymbol = ctx.purpose match
-      case Minting(curSymbol)     => curSymbol
-      case Spending(_)     => throw new RuntimeException("PS")
-      case Rewarding(_) => throw new RuntimeException("PR")
-      case Certifying(_)       => throw new RuntimeException("PC")
+      case Minting(curSymbol) => curSymbol
+      case Spending(_)        => throw new Exception("PS")
+      case Rewarding(_)       => throw new Exception("PR")
+      case Certifying(_)      => throw new Exception("PC")
     val txInfo = ctx.txInfo
     val txOutRefs = List.map(txInfo.inputs)(_.outRef)
     // find the tokens minted by this policy id
@@ -51,12 +51,13 @@ object MintingPolicy {
       case Just(mintedTokens) => mintedTokens
       case Nothing            => throw new Exception("T")
 
-    val checkSpendsTxOut = List.find(txOutRefs) { case TxOutRef(txOutRefTxId, txOutRefIdx) =>
+    val foundTxOutWeMustSpend = List.find(txOutRefs) { case TxOutRef(txOutRefTxId, txOutRefIdx) =>
       txOutRefTxId.hash === txId && txOutRefIdx === txOutIdx
     }
 
     val check = (b: Boolean, msg: String) => if b then () else throw new Exception(msg)
-    checkSpendsTxOut match
+
+    foundTxOutWeMustSpend match
       // If the transaction spends the TxOut, then it's a minting transaction
       case Just(input) => check(Value.equalsAssets(mintedTokens, tokensToMint), "M")
       // Otherwise, it's a burn transaction
@@ -108,7 +109,7 @@ object HoskyMintingPolicyValidator {
     Nothing
   )
 
-  /* 
+  /*
     We need to parameterize the minting policy validator with the AssocMap of tokens to mint.
     We 'compile' the AssocMap to a SIR term
    */
