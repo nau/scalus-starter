@@ -1,6 +1,8 @@
 # Scalus Starter Project
 
-This is a starter project for Scalus. 
+This is a starter project for [Scalus](https://github.com/nau/scalus) -
+Scala implementation of Cardano Plutus Platform.
+
 It contains a simple example of a Minting Policy script written using Scalus.
 
 ## Getting Started
@@ -30,12 +32,12 @@ Run `run` to run the main method, which will print the hex encoded double CBOR o
 
 ## Tutorial
 
-[Read the tutorial](Tutorial.md)
+[Read the tutorial](https://github.com/nau/scalus/blob/0ab6bbe5f1862548d937ba1fd7772fa434b547ff/Tutorial.md)
 
 ## Resources
 
 Find more information about Scalus in the [Scalus repository](https://github.com/nau/scalus).
 
-Scalus Discord: https://discord.gg/DJwAY92Q
+Scalus Discord: https://discord.gg/ygwtuBybsy
 
 Twitter: https://twitter.com/Scalus3
