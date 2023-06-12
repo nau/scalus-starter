@@ -1,6 +1,7 @@
 package starter
 
 import io.bullet.borer.Cbor
+import scalus.*
 import scalus.Compile
 import scalus.Compiler.compile
 import scalus.builtins.Builtins
@@ -72,18 +73,14 @@ object MintingPolicy {
 
 object MintingPolicyGenerator {
   val compiledMintingPolicyScript = compile(MintingPolicy.mintingPolicyScript)
-  val validator =
-    new SimpleSirToUplcLowering(generateErrorTraces = true).lower(compiledMintingPolicyScript)
+  val validator = compiledMintingPolicyScript.toUplc(generateErrorTraces = true)
 
-  def makeMintingPolicyTerm(
-      txOutRefToSpend: TxOutRef,
-      tokensToMint: SIR
-  ): Term =
+  def makeMintingPolicy(txOutRefToSpend: TxOutRef, tokensToMint: SIR): Program =
     import scalus.uplc.TermDSL.{*, given}
     val evaledTokens =
-      val tokens = new SimpleSirToUplcLowering().lower(tokensToMint)
+      val tokens = tokensToMint.toUplc()
       Cek.evalUPLC(tokens) // simplify the term
-    validator $ txOutRefToSpend.id.hash $ txOutRefToSpend.idx $ evaledTokens
+    Program((2, 0, 0), validator $ txOutRefToSpend.id.hash $ txOutRefToSpend.idx $ evaledTokens)
 }
 
 /*
@@ -118,20 +115,18 @@ object HoskyMintingPolicyValidator {
   )
 
   // UPLC term of the minting policy validator
-  val validator = MintingPolicyGenerator.makeMintingPolicyTerm(hoskyMintTxOutRef, tokensToMint)
-  // Flat encoded UPLC term
-  val flatEncoded = ProgramFlatCodec.encodeFlat(Program((2, 0, 0), validator))
-  val cbor = Cbor.encode(flatEncoded).toByteArray
-  val cborHex = Utils.bytesToHex(cbor)
-  // Double CBOR encoded UPLC term
-  // That's what you need to construct a minting transaction
-  val doubleCborHex = Utils.bytesToHex(Cbor.encode(cbor).toByteArray)
+  val script = MintingPolicyGenerator.makeMintingPolicy(hoskyMintTxOutRef, tokensToMint)
+  val cbor = script.cborEncoded
 
   @main def main() = {
     println("Hosky minting policy validator:")
     // Pretty print the minting policy validator's SIR
     println(MintingPolicyGenerator.compiledMintingPolicyScript.pretty.render(100))
-    println("Hosky minting policy validator Double CBOR:")
-    println(doubleCborHex)
+    println("Hosky minting policy validator double CBOR:")
+    // Double CBOR encoded UPLC term
+    // That's what you need to construct a minting transaction
+    println(script.doubleCborHex)
+    // Write the minting policy validator to a .plutus file for use with cardano-cli etc
+    Utils.writePlutusFile("minting.plutus", script)
   }
 }

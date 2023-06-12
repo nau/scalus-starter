@@ -24,8 +24,8 @@ class MintingPolicySpec extends AnyFunSuite with ScalaCheckPropertyChecks {
   val hoskyMintTxOut = HoskyMintingPolicyValidator.hoskyMintTxOut
 
   test("validator size is correct") {
-    val flatSize = HoskyMintingPolicyValidator.flatEncoded.length
-    assert(flatSize == 2458)
+    val size = HoskyMintingPolicyValidator.script.cborEncoded.length
+    assert(size == 2429)
   }
 
   test("should succeed when the TxOutRef is spent and the minted tokens are correct") {
@@ -117,9 +117,8 @@ class MintingPolicySpec extends AnyFunSuite with ScalaCheckPropertyChecks {
   def withScriptContextV2(txInfoInputs: scalus.prelude.List[TxInInfo], value: Value) =
     import Data.toData
     import scalus.ledger.api.v2.ToDataInstances.given
-    Program(
-      (2, 0, 0),
-      HoskyMintingPolicyValidator.validator $ () $ scriptContextV2(txInfoInputs, value).toData
+    HoskyMintingPolicyValidator.script.copy(term =
+      HoskyMintingPolicyValidator.script.term $ () $ scriptContextV2(txInfoInputs, value).toData
     )
 
   def assertEval(p: Program, expected: Expected) = {
