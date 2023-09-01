@@ -6,6 +6,9 @@ target
 /.classpath
 /.project
 /.settings
+.scala-build
+*.plutus
+scala-cli.json
 .DS_Store
 .metals
 .vscode

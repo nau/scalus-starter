@@ -1,3 +1,6 @@
+//> using scala 3.3.0
+//> using plugin org.scalus:scalus-plugin_3:0.3.0
+//> using dep org.scalus:scalus_3:0.3.0
 package starter
 
 import io.bullet.borer.Cbor
@@ -42,9 +45,7 @@ object MintingPolicy {
     // ensure that we are minting and get the PolicyId of the token we are minting
     val ownSymbol = ctx.purpose match
       case Minting(curSymbol) => curSymbol
-      case Spending(_)        => throw new Exception("PS")
-      case Rewarding(_)       => throw new Exception("PR")
-      case Certifying(_)      => throw new Exception("PC")
+      case _                  => throw new Exception("M")
     val txInfo = ctx.txInfo
     val txOutRefs = List.map(txInfo.inputs)(_.outRef)
     // find the tokens minted by this policy id

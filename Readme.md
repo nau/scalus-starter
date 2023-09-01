@@ -13,6 +13,18 @@ Install Nix: https://nixos.org/nix/ with Flakes support.
 
 Or make sure you have Java JDK 11, sbt, and Cardano Plutus uplc tool in your PATH.
 
+### Scala-cli
+
+Install [scala-cli](https://scala-cli.virtuslab.org/).
+
+Then you can run
+
+```shell
+scala-cli src/main/scala/starter/MintingPolicy.scala
+```
+
+to compile and run the example.
+
 ### Working with Nix
 
 Clone this repository and run `nix develop` to enter a shell with all the dependencies.
