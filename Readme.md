@@ -1,7 +1,7 @@
 # Scalus Starter Project
 
-This is a starter project for [Scalus](https://github.com/nau/scalus) -
-Scala implementation of Cardano Plutus Platform.
+This is a starter project for [Scalus](https://scalus.org) -
+Scala-based DApps development platform for Cardano.
 
 It contains a simple example of a Minting Policy script written using Scalus.
 
@@ -9,7 +9,7 @@ It contains a simple example of a Minting Policy script written using Scalus.
 
 ### Prerequisites
 
-Install Nix: https://nixos.org/nix/ with Flakes support.
+Install [Nix](https://nixos.org/nix/) with Flakes support.
 
 Or make sure you have Java JDK 11, sbt, and Cardano Plutus uplc tool in your PATH.
 
@@ -44,12 +44,12 @@ Run `run` to run the main method, which will print the hex encoded double CBOR o
 
 ## Tutorial
 
-[Read the tutorial](https://github.com/nau/scalus/blob/0ab6bbe5f1862548d937ba1fd7772fa434b547ff/Tutorial.md)
+[Read the tutorial](https://scalus.org/docs/Tutorial)
 
 ## Resources
 
 Find more information about Scalus in the [Scalus repository](https://github.com/nau/scalus).
 
-Scalus Discord: https://discord.gg/ygwtuBybsy
+Scalus Discord: <https://discord.gg/ygwtuBybsy>
 
-Twitter: https://twitter.com/Scalus3
+Twitter: [@Scalus3](https://twitter.com/Scalus3)
