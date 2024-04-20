@@ -9,30 +9,24 @@ It contains a simple example of a Minting Policy script written using Scalus.
 
 ### Prerequisites
 
-Install [Nix](https://nixos.org/nix/) with Flakes support.
+You'll need Java JDK 11+, [scala-cli](https://scala-cli.virtuslab.org/) or [sbt](https://www.scala-sbt.org/).
 
-Or make sure you have Java JDK 11, sbt, and Cardano Plutus uplc tool in your PATH.
+If you use Nix, you can run `nix develop` to get a shell with all the dependencies.
 
-### Scala-cli
+### Setup IntelliJ IDEA
 
-Install [scala-cli](https://scala-cli.virtuslab.org/).
+File -> New -> Project from Existing Sources -> select the project directory -> Import project from external model ->
+BSP -> Scala-cli
 
-Then you can run
+### Building with scala-cli
 
-```shell
-scala-cli src/main/scala/starter/MintingPolicy.scala
-```
+Run `scala-cli setup-ide .` to generate IDE configuration files.
 
-to compile and run the example.
+Run `scala-cli .` to compile and run the project.
 
-### Working with Nix
+Run `scala-cli test .` to run the tests.
 
-Clone this repository and run `nix develop` to enter a shell with all the dependencies.
-It may take a while to download all the dependencies the first time.
-
-The shell will have Java JDK 11, sbt, uplc, cardano-node and cardano-cli available.
-
-### Running tests
+### Running tests with sbt
 
 Run `sbt` to enter the SBT shell.
 
