@@ -2,8 +2,9 @@ package starter
 
 import scalus.*
 import scalus.Compiler.compile
+import scalus.builtin.ByteString.StringInterpolators
 import scalus.builtin.Data.fromData
-import scalus.builtin.{ByteString, Data, given}
+import scalus.builtin.{ByteString, Data}
 import scalus.ledger.api.PlutusLedgerLanguage
 import scalus.ledger.api.v2.*
 import scalus.ledger.api.v2.FromDataInstances.given
@@ -25,9 +26,9 @@ object MintingPolicy {
 
     def mintingPolicyScript(
         txId: ByteString, // TxId and output index we must spend to mint tokens
-        txOutIdx: BigInt,
-        tokensToMint: AssocMap[ByteString, BigInt]
-    )(redeemer: Unit, ctxData: Data) = {
+        txOutIdx: BigInt, // TxOut index we must spend to mint tokens
+        tokensToMint: AssocMap[ByteString, BigInt] // tokens to mint
+    )(redeemer: Unit, ctxData: Data): Unit = {
         // deserialize the context from Data to ScriptContext
         val ctx = fromData[ScriptContext](ctxData)
         // ensure that we are minting and get the PolicyId of the token we are minting
@@ -62,10 +63,10 @@ object MintingPolicy {
 }
 
 object MintingPolicyGenerator {
-    val compiledMintingPolicyScript: SIR = compile(MintingPolicy.mintingPolicyScript)
-    private val validator = compiledMintingPolicyScript.toUplc(generateErrorTraces = true)
+    val compiledMintingPolicySIR: SIR = compile(MintingPolicy.mintingPolicyScript)
+    private val validator = compiledMintingPolicySIR.toUplc(generateErrorTraces = true)
 
-    def makeMintingPolicy(txOutRefToSpend: TxOutRef, tokensToMint: SIR): Program =
+    def makeMintingPolicyProgram(txOutRefToSpend: TxOutRef, tokensToMint: SIR): Program =
         import scalus.uplc.TermDSL.{*, given}
         val evaledTokens =
             val tokens = tokensToMint.toUplc()
@@ -81,20 +82,16 @@ object MintingPolicyGenerator {
  We simulate minting of HOSKY tokens. The tokens were minted by spending a 'hoskyMintTxOutRef'
  */
 object HoskyMintingPolicyValidator {
-    val hoskyMintTxOutRef: TxOutRef = TxOutRef(
-      TxId(ByteString.fromHex("1ab6879fc08345f51dc9571ac4f530bf8673e0d798758c470f9af6f98e2f3982")),
-      0
-    )
+    val hoskyMintTxOutRef: TxOutRef =
+        TxOutRef(TxId(hex"1ab6879fc08345f51dc9571ac4f530bf8673e0d798758c470f9af6f98e2f3982"), 0)
     val hoskyMintTxOut: TxOut = TxOut(
       Address(
         Credential.PubKeyCredential(
-          PubKeyHash(
-            ByteString.fromHex("61822dde476439a526070f36d3d1667ad099b462c111cd85e089f5e7f6")
-          )
+          PubKeyHash(hex"61822dde476439a526070f36d3d1667ad099b462c111cd85e089f5e7f6")
         ),
         Nothing
       ),
-      Value.lovelace(BigInt("10000000")),
+      Value.lovelace(10_000_000),
       OutputDatum.NoOutputDatum,
       Nothing
     )
@@ -104,21 +101,22 @@ object HoskyMintingPolicyValidator {
     We 'compile' the AssocMap to a SIR term
      */
     private val tokensToMint: SIR = compile(
-      AssocMap.singleton(ByteString.fromHex("484f534b59"), BigInt("1000000000000000"))
+      AssocMap.singleton(hex"484f534b59", BigInt("1000000000000000"))
     )
 
-    // UPLC term of the minting policy validator
-    val script: Program = MintingPolicyGenerator.makeMintingPolicy(hoskyMintTxOutRef, tokensToMint)
+    // UPLC program of the minting policy validator
+    val mintingPolicyProgram: Program =
+        MintingPolicyGenerator.makeMintingPolicyProgram(hoskyMintTxOutRef, tokensToMint)
 
-    @main def main() = {
+    @main def main(): Unit = {
         println("Hosky minting policy validator:")
         // Pretty print the minting policy validator's SIR
-        println(MintingPolicyGenerator.compiledMintingPolicyScript.pretty.render(100))
+        println(MintingPolicyGenerator.compiledMintingPolicySIR.prettyXTerm.render(100))
         println("Hosky minting policy validator double CBOR:")
         // Double CBOR encoded UPLC term
         // That's what you need to construct a minting transaction
-        println(script.doubleCborHex)
+        println(mintingPolicyProgram.doubleCborHex)
         // Write the minting policy validator to a .plutus file for use with cardano-cli etc
-        Utils.writePlutusFile("minting.plutus", script, PlutusLedgerLanguage.PlutusV2)
+        Utils.writePlutusFile("minting.plutus", mintingPolicyProgram, PlutusLedgerLanguage.PlutusV2)
     }
 }
