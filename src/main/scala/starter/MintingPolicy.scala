@@ -1,33 +1,19 @@
-//> using scala 3.3.1
-//> using plugin org.scalus:scalus-plugin_3:0.4.0
-//> using dep org.scalus:scalus_3:0.4.0
 package starter
 
-import io.bullet.borer.Cbor
-import scalus.Compile
-import scalus.Compiler.compile
 import scalus.*
-import scalus.builtins.Builtins
-import scalus.builtins.ByteString
-import scalus.builtins.given
+import scalus.Compiler.compile
+import scalus.builtin.Data.fromData
+import scalus.builtin.{ByteString, Data, given}
 import scalus.ledger.api.PlutusLedgerLanguage
+import scalus.ledger.api.v2.*
 import scalus.ledger.api.v2.FromDataInstances.given
 import scalus.ledger.api.v2.ScriptPurpose.*
-import scalus.ledger.api.v2.*
-import scalus.prelude.AssocMap
-import scalus.prelude.List
 import scalus.prelude.Maybe.*
-import scalus.prelude.Prelude.===
 import scalus.prelude.Prelude.given
-import scalus.pretty
+import scalus.prelude.{AssocMap, List}
 import scalus.sir.SIR
-import scalus.sir.SimpleSirToUplcLowering
-import scalus.uplc.Cek
-import scalus.uplc.Data
-import scalus.uplc.Data.fromData
 import scalus.uplc.Program
-import scalus.uplc.ProgramFlatCodec
-import scalus.uplc.Term
+import scalus.uplc.eval.VM
 import scalus.utils.Utils
 
 /* This annotation is used to generate the Scalus Intermediate Representation (SIR)
@@ -41,7 +27,7 @@ object MintingPolicy {
         txId: ByteString, // TxId and output index we must spend to mint tokens
         txOutIdx: BigInt,
         tokensToMint: AssocMap[ByteString, BigInt]
-    ) = (redeemer: Unit, ctxData: Data) => {
+    )(redeemer: Unit, ctxData: Data) = {
         // deserialize the context from Data to ScriptContext
         val ctx = fromData[ScriptContext](ctxData)
         // ensure that we are minting and get the PolicyId of the token we are minting
@@ -57,7 +43,7 @@ object MintingPolicy {
 
         val foundTxOutWeMustSpend = List.find(txOutRefs) {
             case TxOutRef(txOutRefTxId, txOutRefIdx) =>
-                txOutRefTxId.hash === txId && txOutRefIdx === txOutIdx
+                txOutRefTxId.hash == txId && txOutRefIdx == txOutIdx
         }
 
         val check = (b: Boolean, msg: String) => if b then () else throw new Exception(msg)
@@ -76,14 +62,14 @@ object MintingPolicy {
 }
 
 object MintingPolicyGenerator {
-    val compiledMintingPolicyScript = compile(MintingPolicy.mintingPolicyScript)
-    val validator = compiledMintingPolicyScript.toUplc(generateErrorTraces = true)
+    val compiledMintingPolicyScript: SIR = compile(MintingPolicy.mintingPolicyScript)
+    private val validator = compiledMintingPolicyScript.toUplc(generateErrorTraces = true)
 
     def makeMintingPolicy(txOutRefToSpend: TxOutRef, tokensToMint: SIR): Program =
         import scalus.uplc.TermDSL.{*, given}
         val evaledTokens =
             val tokens = tokensToMint.toUplc()
-            Cek.evalUPLC(tokens) // simplify the term
+            VM.evaluateTerm(tokens) // simplify the term
 
         val appliedValidator =
             validator $ txOutRefToSpend.id.hash $ txOutRefToSpend.idx $ evaledTokens
@@ -95,11 +81,11 @@ object MintingPolicyGenerator {
  We simulate minting of HOSKY tokens. The tokens were minted by spending a 'hoskyMintTxOutRef'
  */
 object HoskyMintingPolicyValidator {
-    val hoskyMintTxOutRef = TxOutRef(
+    val hoskyMintTxOutRef: TxOutRef = TxOutRef(
       TxId(ByteString.fromHex("1ab6879fc08345f51dc9571ac4f530bf8673e0d798758c470f9af6f98e2f3982")),
       0
     )
-    val hoskyMintTxOut = TxOut(
+    val hoskyMintTxOut: TxOut = TxOut(
       Address(
         Credential.PubKeyCredential(
           PubKeyHash(
@@ -117,13 +103,12 @@ object HoskyMintingPolicyValidator {
     We need to parameterize the minting policy validator with the AssocMap of tokens to mint.
     We 'compile' the AssocMap to a SIR term
      */
-    val tokensToMint: SIR = compile(
+    private val tokensToMint: SIR = compile(
       AssocMap.singleton(ByteString.fromHex("484f534b59"), BigInt("1000000000000000"))
     )
 
     // UPLC term of the minting policy validator
-    val script = MintingPolicyGenerator.makeMintingPolicy(hoskyMintTxOutRef, tokensToMint)
-    val cbor = script.cborEncoded
+    val script: Program = MintingPolicyGenerator.makeMintingPolicy(hoskyMintTxOutRef, tokensToMint)
 
     @main def main() = {
         println("Hosky minting policy validator:")

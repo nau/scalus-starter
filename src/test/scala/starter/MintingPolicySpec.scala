@@ -2,15 +2,17 @@ package scalus
 
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-import scalus.Compiler.compile
-import scalus.builtins.ByteString
-import scalus.builtins.ByteString.given
+import scalus.builtin.ByteString.given
+import scalus.builtin.{ByteString, Data}
 import scalus.ledger.api.v2.*
 import scalus.prelude.*
-import scalus.sir.SimpleSirToUplcLowering
-import scalus.uplc.TermDSL.{_, given}
 import scalus.uplc.*
+import scalus.uplc.TermDSL.{*, given}
+import scalus.uplc.eval.VM
 import starter.HoskyMintingPolicyValidator
+
+import scala.util
+import scala.util.Try
 
 enum Expected {
     case Success(value: Term)
@@ -20,12 +22,12 @@ enum Expected {
 class MintingPolicySpec extends AnyFunSuite with ScalaCheckPropertyChecks {
     import Expected.*
 
-    val hoskyMintTxOutRef = HoskyMintingPolicyValidator.hoskyMintTxOutRef
-    val hoskyMintTxOut = HoskyMintingPolicyValidator.hoskyMintTxOut
+    val hoskyMintTxOutRef: TxOutRef = HoskyMintingPolicyValidator.hoskyMintTxOutRef
+    val hoskyMintTxOut: TxOut = HoskyMintingPolicyValidator.hoskyMintTxOut
 
     test("validator size is correct") {
         val size = HoskyMintingPolicyValidator.script.cborEncoded.length
-        assert(size == 2426)
+        assert(size == 2424)
     }
 
     test("should succeed when the TxOutRef is spent and the minted tokens are correct") {
@@ -114,7 +116,7 @@ class MintingPolicySpec extends AnyFunSuite with ScalaCheckPropertyChecks {
           ScriptPurpose.Minting(hex"a0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235")
         )
 
-    def withScriptContextV2(txInfoInputs: scalus.prelude.List[TxInInfo], value: Value) =
+    def withScriptContextV2(txInfoInputs: scalus.prelude.List[TxInInfo], value: Value): Program =
         import Data.toData
         import scalus.ledger.api.v2.ToDataInstances.given
         HoskyMintingPolicyValidator.script.copy(term =
@@ -124,12 +126,12 @@ class MintingPolicySpec extends AnyFunSuite with ScalaCheckPropertyChecks {
             ).toData
         )
 
-    def assertEval(p: Program, expected: Expected) = {
-        val result = PlutusUplcEval.evalFlat(p)
+    def assertEval(p: Program, expected: Expected): Unit = {
+        val result = Try(VM.evaluateTerm(p.term))
         (result, expected) match
-            case (UplcEvalResult.Success(result), Expected.Success(expected)) =>
+            case (util.Success(result), Expected.Success(expected)) =>
                 assert(result == expected)
-            case (UplcEvalResult.UplcFailure(code, error), Expected.Failure(expected)) =>
+            case (util.Failure(_), Expected.Failure(expected)) =>
             case _ => fail(s"Unexpected result: $result, expected: $expected")
     }
 }
