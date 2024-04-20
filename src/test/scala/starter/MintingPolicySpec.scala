@@ -3,19 +3,19 @@ package scalus
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import scalus.builtin.ByteString.given
-import scalus.builtin.{ByteString, Data}
+import scalus.builtin.{ByteString, Data, PlatformSpecific}
 import scalus.ledger.api.v2.*
 import scalus.prelude.*
 import scalus.uplc.*
 import scalus.uplc.TermDSL.{*, given}
-import scalus.uplc.eval.VM
+import scalus.uplc.eval.*
 import starter.HoskyMintingPolicyValidator
 
 import scala.util
 import scala.util.Try
 
 enum Expected {
-    case Success(value: Term)
+    case Success(budget: ExBudget)
     case Failure(reason: String)
 }
 
@@ -27,7 +27,7 @@ class MintingPolicySpec extends AnyFunSuite with ScalaCheckPropertyChecks {
 
     test("validator size is correct") {
         val size = HoskyMintingPolicyValidator.mintingPolicyProgram.cborEncoded.length
-        assert(size == 2424)
+        assert(size == 2417)
     }
 
     test("should succeed when the TxOutRef is spent and the minted tokens are correct") {
@@ -41,7 +41,7 @@ class MintingPolicySpec extends AnyFunSuite with ScalaCheckPropertyChecks {
               BigInt("1000000000000000")
             )
           ),
-          Success(())
+          Success(ExBudget.fromCpuAndMemory(cpu = 96_657049, memory = 345850))
         )
     }
 
@@ -55,7 +55,7 @@ class MintingPolicySpec extends AnyFunSuite with ScalaCheckPropertyChecks {
               BigInt(-100)
             )
           ),
-          Success(())
+          Success(ExBudget.fromCpuAndMemory(cpu = 64_879041, memory = 232847))
         )
     }
 
@@ -97,18 +97,18 @@ class MintingPolicySpec extends AnyFunSuite with ScalaCheckPropertyChecks {
         )
     }
 
-    private def scriptContextV2(txInfoInputs: scalus.prelude.List[TxInInfo], value: Value) =
+    private def makeScriptContextV2(txInfoInputs: List[TxInInfo], value: Value) =
         ScriptContext(
           TxInfo(
             inputs = txInfoInputs,
-            referenceInputs = scalus.prelude.List.Nil,
-            outputs = scalus.prelude.List.Nil,
+            referenceInputs = List.Nil,
+            outputs = List.Nil,
             fee = Value.lovelace(BigInt("188021")),
             mint = value,
-            dcert = scalus.prelude.List.Nil,
+            dcert = List.Nil,
             withdrawals = AssocMap.empty,
             validRange = Interval.always,
-            signatories = scalus.prelude.List.Nil,
+            signatories = List.Nil,
             redeemers = AssocMap.empty,
             data = AssocMap.empty,
             id = TxId(hex"1e0612fbd127baddfcd555706de96b46c4d4363ac78c73ab4dee6e6a7bf61fe9")
@@ -116,18 +116,29 @@ class MintingPolicySpec extends AnyFunSuite with ScalaCheckPropertyChecks {
           ScriptPurpose.Minting(hex"a0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235")
         )
 
-    def withScriptContextV2(txInfoInputs: scalus.prelude.List[TxInInfo], value: Value): Program =
+    def withScriptContextV2(txInfoInputs: List[TxInInfo], value: Value): Program =
         import Data.toData
         import scalus.ledger.api.v2.ToDataInstances.given
         HoskyMintingPolicyValidator.mintingPolicyProgram.copy(term =
-            HoskyMintingPolicyValidator.mintingPolicyProgram.term $ () $ scriptContextV2(
+            HoskyMintingPolicyValidator.mintingPolicyProgram.term $ () $ makeScriptContextV2(
               txInfoInputs,
               value
             ).toData
         )
 
     def assertEval(p: Program, expected: Expected): Unit = {
-        val result = Try(VM.evaluateTerm(p.term))
+        val result = Try:
+            import scalus.builtin.given
+            val budgetSpender = CountingBudgetSpender()
+            val cek = new CekMachine(
+              MachineParams.defaultParams,
+              budgetSpender,
+              NoLogger,
+              summon[PlatformSpecific]
+            )
+            val debruijnedTerm = DeBruijn.deBruijnTerm(p.term)
+            cek.evaluateTerm(debruijnedTerm)
+            budgetSpender.getSpentBudget
         (result, expected) match
             case (util.Success(result), Expected.Success(expected)) =>
                 assert(result == expected)

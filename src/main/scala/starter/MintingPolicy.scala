@@ -47,18 +47,18 @@ object MintingPolicy {
                 txOutRefTxId.hash == txId && txOutRefIdx == txOutIdx
         }
 
-        val check = (b: Boolean, msg: String) => if b then () else throw new Exception(msg)
-
         foundTxOutWeMustSpend match
             // If the transaction spends the TxOut, then it's a minting transaction
-            case Just(input) => check(Value.equalsAssets(mintedTokens, tokensToMint), "M")
+            case Just(input) =>
+                if Value.equalsAssets(mintedTokens, tokensToMint) then ()
+                else throw new Exception("M")
             // Otherwise, it's a burn transaction
             case Nothing =>
                 // check burned
                 val burned = List.all(mintedTokens.inner) { case (tokenName, amount) =>
                     amount < 0
                 }
-                check(burned, "B")
+                if burned then () else throw new Exception("B")
     }
 }
 
