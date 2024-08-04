@@ -1,7 +1,5 @@
-package scalus
+package starter
 
-import org.scalatest.funsuite.AnyFunSuite
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import scalus.builtin.ByteString.given
 import scalus.builtin.{ByteString, Data, PlatformSpecific}
 import scalus.ledger.api.v2.*
@@ -11,6 +9,7 @@ import scalus.uplc.TermDSL.{*, given}
 import scalus.uplc.eval.*
 import starter.HoskyMintingPolicyValidator
 
+import scala.language.implicitConversions
 import scala.util
 import scala.util.Try
 
@@ -19,7 +18,7 @@ enum Expected {
     case Failure(reason: String)
 }
 
-class MintingPolicySpec extends AnyFunSuite with ScalaCheckPropertyChecks {
+class MintingPolicySpec extends munit.ScalaCheckSuite {
     import Expected.*
 
     val hoskyMintTxOutRef: TxOutRef = HoskyMintingPolicyValidator.hoskyMintTxOutRef
@@ -27,7 +26,7 @@ class MintingPolicySpec extends AnyFunSuite with ScalaCheckPropertyChecks {
 
     test("validator size is correct") {
         val size = HoskyMintingPolicyValidator.mintingPolicyProgram.cborEncoded.length
-        assert(size == 2417)
+        assertEquals(size, 2338)
     }
 
     test("should succeed when the TxOutRef is spent and the minted tokens are correct") {
@@ -41,7 +40,7 @@ class MintingPolicySpec extends AnyFunSuite with ScalaCheckPropertyChecks {
               BigInt("1000000000000000")
             )
           ),
-          Success(ExBudget.fromCpuAndMemory(cpu = 96_657049, memory = 345850))
+          Success(ExBudget.fromCpuAndMemory(cpu = 93_501256, memory = 333154))
         )
     }
 
@@ -55,7 +54,7 @@ class MintingPolicySpec extends AnyFunSuite with ScalaCheckPropertyChecks {
               BigInt(-100)
             )
           ),
-          Success(ExBudget.fromCpuAndMemory(cpu = 64_879041, memory = 232847))
+          Success(ExBudget.fromCpuAndMemory(cpu = 62_453179, memory = 222983))
         )
     }
 
@@ -141,7 +140,7 @@ class MintingPolicySpec extends AnyFunSuite with ScalaCheckPropertyChecks {
             budgetSpender.getSpentBudget
         (result, expected) match
             case (util.Success(result), Expected.Success(expected)) =>
-                assert(result == expected)
+                assertEquals(result, expected)
             case (util.Failure(_), Expected.Failure(expected)) =>
             case _ => fail(s"Unexpected result: $result, expected: $expected")
     }

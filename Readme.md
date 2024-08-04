@@ -26,16 +26,6 @@ Run `scala-cli .` to compile and run the project.
 
 Run `scala-cli test .` to run the tests.
 
-### Running tests with sbt
-
-Run `sbt` to enter the SBT shell.
-
-Then run `test` to run the tests.
-
-Run `~testQuick` to run the tests automatically when a file changes.
-
-Run `run` to run the main method, which will print the hex encoded double CBOR of Minting Policy script.
-
 ## Tutorial
 
 [Read the tutorial](https://scalus.org/docs/Tutorial)

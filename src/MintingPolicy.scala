@@ -16,6 +16,7 @@ import scalus.sir.SIR
 import scalus.uplc.Program
 import scalus.uplc.eval.VM
 import scalus.utils.Utils
+import scala.language.implicitConversions
 
 /* This annotation is used to generate the Scalus Intermediate Representation (SIR)
    for the code in the annotated object.
@@ -30,7 +31,7 @@ object MintingPolicy {
         tokensToMint: AssocMap[ByteString, BigInt] // tokens to mint
     )(redeemer: Unit, ctxData: Data): Unit = {
         // deserialize the context from Data to ScriptContext
-        val ctx = fromData[ScriptContext](ctxData)
+        val ctx = ctxData.to[ScriptContext]
         // ensure that we are minting and get the PolicyId of the token we are minting
         val ownSymbol = ctx.purpose match
             case Minting(curSymbol) => curSymbol
