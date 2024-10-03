@@ -26,7 +26,7 @@ class MintingPolicySpec extends munit.ScalaCheckSuite {
 
     test("validator size is correct") {
         val size = HoskyMintingPolicyValidator.mintingPolicyProgram.cborEncoded.length
-        assertEquals(size, 2338)
+        assertEquals(size, 2347)
     }
 
     test("should succeed when the TxOutRef is spent and the minted tokens are correct") {
@@ -40,7 +40,7 @@ class MintingPolicySpec extends munit.ScalaCheckSuite {
               BigInt("1000000000000000")
             )
           ),
-          Success(ExBudget.fromCpuAndMemory(cpu = 93_501256, memory = 333154))
+          Success(ExBudget.fromCpuAndMemory(cpu = 73784528, memory = 329554))
         )
     }
 
@@ -54,7 +54,7 @@ class MintingPolicySpec extends munit.ScalaCheckSuite {
               BigInt(-100)
             )
           ),
-          Success(ExBudget.fromCpuAndMemory(cpu = 62_453179, memory = 222983))
+          Success(ExBudget.fromCpuAndMemory(cpu = 49869100, memory = 219383))
         )
     }
 
@@ -130,7 +130,7 @@ class MintingPolicySpec extends munit.ScalaCheckSuite {
             import scalus.builtin.given
             val budgetSpender = CountingBudgetSpender()
             val cek = new CekMachine(
-              MachineParams.defaultParams,
+              MachineParams.defaultPlutusV2PostConwayParams,
               budgetSpender,
               NoLogger,
               summon[PlatformSpecific]
