@@ -13,6 +13,8 @@
       (system:
       let
         pkgs = import nixpkgs { inherit system; };
+        jdk = pkgs.openjdk21;
+        sbt = pkgs.sbt.override { jre = jdk; };
       in
       rec {
         devShell = pkgs.mkShell {
@@ -22,6 +24,7 @@
             git
             openjdk21
             scala-cli
+            sbt
           ];
         };
       })
