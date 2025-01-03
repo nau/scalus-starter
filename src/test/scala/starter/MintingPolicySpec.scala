@@ -1,17 +1,19 @@
 package starter
 
+import com.bloxbean.cardano.client.account.Account
+import scalus.*
+import scalus.builtin.given
 import scalus.builtin.ByteString.given
+import scalus.builtin.Data.toData
 import scalus.builtin.{ByteString, Data, PlatformSpecific}
-import scalus.ledger.api.v2.*
+import scalus.ledger.api.v3.*
+import scalus.ledger.api.v3.ToDataInstances.given
 import scalus.prelude.*
 import scalus.uplc.*
 import scalus.uplc.TermDSL.{*, given}
 import scalus.uplc.eval.*
-import starter.HoskyMintingPolicyValidator
 
 import scala.language.implicitConversions
-import scala.util
-import scala.util.Try
 
 enum Expected {
     case Success(budget: ExBudget)
@@ -21,127 +23,111 @@ enum Expected {
 class MintingPolicySpec extends munit.ScalaCheckSuite {
     import Expected.*
 
-    val hoskyMintTxOutRef: TxOutRef = HoskyMintingPolicyValidator.hoskyMintTxOutRef
-    val hoskyMintTxOut: TxOut = HoskyMintingPolicyValidator.hoskyMintTxOut
+    // Plutus V3 VM with default machine parameters
+    private given PlutusVM = PlutusVM.makePlutusV3VM()
 
-    test("validator size is correct") {
-        val size = HoskyMintingPolicyValidator.mintingPolicyProgram.cborEncoded.length
-        assertEquals(size, 2347)
+    private val account = new Account()
+
+    private val crypto = summon[PlatformSpecific] // platform specific crypto functions
+
+    private val tokenName = ByteString.fromString("CO2 Tonne")
+
+    private val pubKeyHash: PubKeyHash = PubKeyHash(
+      ByteString.fromArray(account.hdKeyPair().getPublicKey.getKeyHash)
+    )
+
+    private val mintingScript =
+        MintingPolicyGenerator.makeMintingPolicyScript(pubKeyHash, tokenName)
+
+    test(s"validator size is ${mintingScript.script.flatEncoded.length} bytes") {
+        val size = mintingScript.script.flatEncoded.length
+        assertEquals(size, 3516)
     }
 
-    test("should succeed when the TxOutRef is spent and the minted tokens are correct") {
-        // The minting policy script should succeed when the TxOutRef is spent and the minted tokens are correct
+    test(
+      "minting should succeed when minted token name is correct and admin signature is correct"
+    ) {
+        val ctx = makeScriptContext(
+          mint = Value(mintingScript.scriptHash, tokenName, 1000),
+          signatories = List(pubKeyHash)
+        )
+        // run the minting policy script as a Scala function
+        // here you can use debugger to debug the minting policy script
+        MintingPolicy.mintingPolicy(pubKeyHash, tokenName, ctx)
+        // run the minting policy script as a Plutus script
         assertEval(
-          withScriptContextV2(
-            List(TxInInfo(hoskyMintTxOutRef, hoskyMintTxOut)),
-            Value(
-              hex"a0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235",
-              hex"484f534b59",
-              BigInt("1000000000000000")
-            )
-          ),
-          Success(ExBudget.fromCpuAndMemory(cpu = 73784528, memory = 329554))
+          mintingScript.script $ ctx.toData,
+          Success(ExBudget.fromCpuAndMemory(cpu = 49532838, memory = 188639))
         )
     }
 
-    test("should successfully burn, the minted tokens are negative and TxOutRef is not spent") {
-        assertEval(
-          withScriptContextV2(
-            List.empty,
-            Value(
-              hex"a0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235",
-              hex"484f534b59",
-              BigInt(-100)
-            )
-          ),
-          Success(ExBudget.fromCpuAndMemory(cpu = 49869100, memory = 219383))
+    test("minting should fail when minted token name is not correct") {
+        val ctx = makeScriptContext(
+          mint = Value(mintingScript.scriptHash, tokenName ++ ByteString.fromString("extra"), 1000),
+          signatories = List(pubKeyHash)
         )
+
+        interceptMessage[IllegalArgumentException]("Token name not found"):
+            MintingPolicy.mintingPolicy(pubKeyHash, tokenName, ctx)
+
+        assertEval(mintingScript.script $ ctx.toData, Failure("Error evaluated"))
     }
 
-    test("should fail when the TxOutRef is not spent") {
-        assertEval(
-          withScriptContextV2(
-            List.empty,
-            Value(
-              hex"a0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235",
-              hex"484f534b59",
-              BigInt("1000000000000000")
-            )
-          ),
-          Failure("TxOutRef not spent")
+    test("minting should fail when admin signature is not correct") {
+        val ctx = makeScriptContext(
+          mint = Value(mintingScript.scriptHash, tokenName, 1000),
+          signatories = List(PubKeyHash(crypto.blake2b_224(ByteString.fromString("wrong"))))
         )
+
+        interceptMessage[Exception]("Not found"):
+            MintingPolicy.mintingPolicy(pubKeyHash, tokenName, ctx)
+
+        assertEval(mintingScript.script $ ctx.toData, Failure("Error evaluated"))
     }
 
-    test("should fail when the minted tokens are negative") {
-        assertEval(
-          withScriptContextV2(
-            List(TxInInfo(hoskyMintTxOutRef, hoskyMintTxOut)),
-            Value(
-              hex"a0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235",
-              hex"484f534b59",
-              BigInt(-100)
-            )
-          ),
-          Failure("Wrong amount")
+    test("minting should fail when admin signature is not provided") {
+        val ctx = makeScriptContext(
+          mint = Value(mintingScript.scriptHash, tokenName, 1000),
+          signatories = List.Nil
         )
-    }
 
-    test("should fail when given the wrong Policy ID") {
-        assertEval(
-          withScriptContextV2(
-            List(TxInInfo(hoskyMintTxOutRef, hoskyMintTxOut)),
-            Value(hex"cc", hex"484f534b59", BigInt("1000000000000000"))
-          ),
-          Failure("Wrong Policy ID")
-        )
-    }
+        interceptMessage[Exception]("Not found"):
+            MintingPolicy.mintingPolicy(pubKeyHash, tokenName, ctx)
 
-    private def makeScriptContextV2(txInfoInputs: List[TxInInfo], value: Value) =
+        assertEval(mintingScript.script $ ctx.toData, Failure("Error evaluated"))
+    }
+    
+    private def makeScriptContext(mint: Value, signatories: List[PubKeyHash]) =
         ScriptContext(
-          TxInfo(
-            inputs = txInfoInputs,
+          txInfo = TxInfo(
+            inputs = List.Nil,
             referenceInputs = List.Nil,
             outputs = List.Nil,
-            fee = Value.lovelace(BigInt("188021")),
-            mint = value,
-            dcert = List.Nil,
+            fee = BigInt("188021"),
+            mint = mint,
+            certificates = List.Nil,
             withdrawals = AssocMap.empty,
             validRange = Interval.always,
-            signatories = List.Nil,
+            signatories = signatories,
             redeemers = AssocMap.empty,
             data = AssocMap.empty,
-            id = TxId(hex"1e0612fbd127baddfcd555706de96b46c4d4363ac78c73ab4dee6e6a7bf61fe9")
+            id = TxId(hex"1e0612fbd127baddfcd555706de96b46c4d4363ac78c73ab4dee6e6a7bf61fe9"),
+            votes = AssocMap.empty,
+            proposalProcedures = List.Nil,
+            currentTreasuryAmount = Maybe.Nothing,
+            treasuryDonation = Maybe.Nothing
           ),
-          ScriptPurpose.Minting(hex"a0028f350aaabe0545fdcb56b039bfb08e4bb4d8c4d7c3c7d481c235")
-        )
-
-    def withScriptContextV2(txInfoInputs: List[TxInInfo], value: Value): Program =
-        import Data.toData
-        import scalus.ledger.api.v2.ToDataInstances.given
-        HoskyMintingPolicyValidator.mintingPolicyProgram.copy(term =
-            HoskyMintingPolicyValidator.mintingPolicyProgram.term $ () $ makeScriptContextV2(
-              txInfoInputs,
-              value
-            ).toData
+          redeemer = Data.unit,
+          scriptInfo = ScriptInfo.MintingScript(mintingScript.scriptHash)
         )
 
     def assertEval(p: Program, expected: Expected): Unit = {
-        val result = Try:
-            import scalus.builtin.given
-            val budgetSpender = CountingBudgetSpender()
-            val cek = new CekMachine(
-              MachineParams.defaultPlutusV2PostConwayParams,
-              budgetSpender,
-              NoLogger,
-              summon[PlatformSpecific]
-            )
-            val debruijnedTerm = DeBruijn.deBruijnTerm(p.term)
-            cek.evaluateTerm(debruijnedTerm)
-            budgetSpender.getSpentBudget
+        val result = p.evaluateDebug
         (result, expected) match
-            case (util.Success(result), Expected.Success(expected)) =>
-                assertEquals(result, expected)
-            case (util.Failure(_), Expected.Failure(expected)) =>
+            case (result: Result.Success, Expected.Success(expected)) =>
+                assertEquals(result.budget, expected)
+            case (result: Result.Failure, Expected.Failure(expected)) =>
+                assertEquals(result.exception.getMessage, expected)
             case _ => fail(s"Unexpected result: $result, expected: $expected")
     }
 }

@@ -2,13 +2,25 @@ scalaVersion := "3.3.4"
 
 scalacOptions ++= Seq("-feature", "-deprecation", "-unchecked")
 
+val scalusVersion = "0.8.3+7-70400d11+20250103-2110-SNAPSHOT"
+
 // Add the Scalus compiler plugin
-addCompilerPlugin("org.scalus" %% "scalus-plugin" % "0.8.3")
+addCompilerPlugin("org.scalus" %% "scalus-plugin" % scalusVersion)
 
 // Add the Scalus library and the Cardano Client library integration
 libraryDependencies ++= Seq(
-  "org.scalus" % "scalus_3" % "0.8.3",
-  "org.scalus" % "scalus-bloxbean-cardano-client-lib_3" % "0.8.3"
+  // Scalus
+  "org.scalus" % "scalus_3" % scalusVersion,
+  "org.scalus" % "scalus-bloxbean-cardano-client-lib_3" % scalusVersion,
+  // Cardano Client library
+  "com.bloxbean.cardano" % "cardano-client-lib" % "0.6.3",
+  "com.bloxbean.cardano" % "cardano-client-backend-blockfrost" % "0.6.3",
+  "org.bouncycastle" % "bcprov-jdk18on" % "1.79",
+  "com.softwaremill.sttp.tapir" %% "tapir-netty-server-sync" % "1.11.11",
+  "com.softwaremill.sttp.tapir" %% "tapir-swagger-ui-bundle" % "1.11.11",
+  // Argument parsing
+  "com.monovore" %% "decline" % "2.4.1",
+  "org.slf4j" % "slf4j-simple" % "2.0.16"
 )
 
 // Test dependencies
