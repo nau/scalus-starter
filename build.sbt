@@ -1,4 +1,4 @@
-val scalusVersion = "0.8.3+7-70400d11+20250103-2110-SNAPSHOT"
+val scalusVersion = "0.8.4"
 
 // Latest Scala 3 LTS version
 ThisBuild / scalaVersion := "3.3.4"
