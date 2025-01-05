@@ -16,7 +16,41 @@ If you use Nix, you can run `nix develop` to get a shell with all the dependenci
 ### Setup IntelliJ IDEA
 
 File -> New -> Project from Existing Sources -> select the project directory -> Import project from external model ->
-BSP -> Scala-cli
+BSP -> Sbt
+
+### Building with sbt
+
+Run `sbt` to enter the sbt shell.
+
+Run `compile` to compile the project.
+
+Run `test` to run the tests.
+
+Run `integration/test` to run the integration tests.
+
+Run `scalafmtAll` to format the code.
+
+### Setup Yaci Devkit for integration tests
+
+Follow instructions from the [Yaci Devkit](https://devkit.yaci.xyz/) to setup the devkit.
+
+Create and run a local Cardano node with the devkit:
+
+```shell
+devkit
+> create-node
+> start
+```
+
+#### Resetting the local Cardano node
+
+If you need to reset the local Cardano node, you can run:
+
+```shell
+reset
+```
+
+in the devkit shell.
 
 ### Building with scala-cli
 
@@ -26,11 +60,13 @@ Run `scala-cli .` to compile and run the project.
 
 Run `scala-cli test .` to run the tests.
 
-## Tutorial
+## Scalus Tutorial
 
 [Read the tutorial](https://scalus.org/docs/Tutorial)
 
 ## Resources
+
+Scalus official website: <https://scalus.org>
 
 Find more information about Scalus in the [Scalus repository](https://github.com/nau/scalus).
 

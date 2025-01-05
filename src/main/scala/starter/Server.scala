@@ -37,6 +37,8 @@ case class AppCtx(
       ByteString.fromArray(account.hdKeyPair().getPublicKey.getKeyHash)
     )
     lazy val tokenNameByteString: ByteString = ByteString.fromString(tokenName)
+    // combined minting script hash and token name
+    lazy val unitName: String = (mintingScript.scriptHash ++ tokenNameByteString).toHex
     lazy val mintingScript: MintingPolicyScript =
         MintingPolicyGenerator.makeMintingPolicyScript(pubKeyHash, tokenNameByteString)
 }
@@ -60,7 +62,27 @@ object AppCtx {
           tokenName
         )
     }
+
+    def yaciDevKit(
+        tokenName: String
+    ): AppCtx = {
+        val url = "http://localhost:8080/api/v1/"
+        val network = new Network(0, 42)
+        val mnemonic =
+            "test test test test test test test test test test test test test test test test test test test test test test test sauce"
+        new AppCtx(
+          network,
+          new Account(network, mnemonic),
+          new BFBackendService(url, ""),
+          tokenName
+        )
+    }
 }
+
+extension [A](result: Result[A])
+    def toEither: Either[String, A] =
+        if result.isSuccessful then Right(result.getValue)
+        else Left(result.getResponse)
 
 class TxBuilder(ctx: AppCtx) {
     private val backendService = ctx.backendService
@@ -75,23 +97,45 @@ class TxBuilder(ctx: AppCtx) {
 
     private lazy val utxoSupplier = new DefaultUtxoSupplier(backendService.getUtxoService)
 
-    extension [A](result: Result[A])
-        def toEither: Either[String, A] =
-            if result.isSuccessful then Right(result.getValue)
-            else Left(result.getResponse)
+    private lazy val evaluator = ScalusTransactionEvaluator(
+      slotConfig = SlotConfig.Preprod,
+      protocolParams = protocolParams,
+      utxoSupplier = utxoSupplier,
+      scriptSupplier = NoScriptSupplier(),
+      mode = EvaluatorMode.EVALUATE_AND_COMPUTE_COST
+    )
 
     def makeMintingTx(amount: Long): Either[String, Transaction] = {
-        val evaluator = ScalusTransactionEvaluator(
-          slotConfig = SlotConfig.Preprod,
-          protocolParams = protocolParams,
-          utxoSupplier = utxoSupplier,
-          scriptSupplier = NoScriptSupplier(),
-          mode = EvaluatorMode.EVALUATE_AND_COMPUTE_COST
-        )
-
         for
             utxo <- backendService.getUtxoService
                 .getUtxos(account.getBaseAddress.getAddress, 100, 1)
+                .toEither
+
+            scriptTx = new ScriptTx()
+                .mintAsset(
+                  ctx.mintingScript.plutusScript,
+                  Asset.builder().name(ctx.tokenName).value(BigInteger.valueOf(amount)).build(),
+                  PlutusData.unit(),
+                  account.getBaseAddress.getAddress
+                )
+                .collectFrom(utxo)
+                .withChangeAddress(account.getBaseAddress.getAddress)
+
+            signedTx = quickTxBuilder
+                .compose(scriptTx)
+                // evaluate script cost using scalus
+                .withTxEvaluator(evaluator)
+                .withSigner(SignerProviders.signerFrom(account))
+                .withRequiredSigners(account.getBaseAddress)
+                .feePayer(account.baseAddress())
+                .buildAndSign()
+        yield signedTx
+    }
+
+    def makeBurningTx(amount: Long): Either[String, Transaction] = {
+        for
+            utxo <- backendService.getUtxoService
+                .getUtxos(account.getBaseAddress.getAddress, ctx.unitName, 100, 1)
                 .toEither
 
             scriptTx = new ScriptTx()
@@ -143,6 +187,6 @@ class Server(ctx: AppCtx):
 
     def start(): Unit =
         NettySyncServer()
-            .port(8080)
+            .port(8088)
             .addEndpoints(apiEndpoints ++ swaggerEndpoints)
             .startAndWait()

@@ -1,20 +1,11 @@
 package starter
 
-import com.bloxbean.cardano.client.common.model.Networks
 import scalus.*
 import scalus.builtin.ByteString
-import scalus.ledger.api.v3.*
 
 class TxBuilderSpec extends munit.ScalaCheckSuite {
 
-    private val tokenName = "CO2 Tonne"
-    private lazy val appCtx =
-        AppCtx(
-          Networks.preprod(),
-          System.getenv("MNEMONIC"),
-          System.getenv("BLOCKFROST_API_KEY"),
-          tokenName
-        )
+    private val appCtx = AppCtx.yaciDevKit("CO2 Tonne")
 
     private val pubKey: ByteString = ByteString.fromArray(appCtx.account.publicKeyBytes())
 

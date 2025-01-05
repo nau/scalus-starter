@@ -96,7 +96,7 @@ class MintingPolicySpec extends munit.ScalaCheckSuite {
 
         assertEval(mintingScript.script $ ctx.toData, Failure("Error evaluated"))
     }
-    
+
     private def makeScriptContext(mint: Value, signatories: List[PubKeyHash]) =
         ScriptContext(
           txInfo = TxInfo(
